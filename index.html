@@ -202,10 +202,7 @@ function buildDayGrid() {
         html += '<div class="day-controls">';
         html += '<button class="btn-adj" onclick="adj('+i+',-1)">\u2212</button>';
         html += '<select class="radial-dd" id="dd'+i+'" onchange="ddChange('+i+')">';
-        html += '<option disabled hidden></option>';
-        html += '<option value="24"'+(v===24?' selected':'')+'>24</option>';
-        html += '<option value="0"'+(v===0?' selected':'')+'>0</option>';
-        for(var n=23;n>=1;n--) html += '<option value="'+n+'"'+(v===n?' selected':'')+'>'+n+'</option>';
+        for(var n=0;n<=24;n++) html += '<option value="'+n+'"'+(v===n?' selected':'')+'>'+n+'</option>';
         html += '</select>';
         html += '<button class="btn-adj" onclick="adj('+i+',1)">+</button>';
         html += '<button class="'+nc+'" id="nb'+i+'" onclick="openReasonModal('+i+')">\u270E</button>';
