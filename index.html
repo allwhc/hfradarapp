@@ -200,13 +200,13 @@ function buildDayGrid() {
         html += '<div class="day-info"><div class="day-date">'+dn+'/'+month+'/'+year+'</div>';
         html += '<div class="day-name">Day '+dn+' ('+name+')</div></div>';
         html += '<div class="day-controls">';
+        html += '<button class="btn-adj" onclick="adj('+i+',-1)">\u2212</button>';
         html += '<select class="radial-dd" id="dd'+i+'" onchange="ddChange('+i+')">';
+        html += '<option disabled hidden></option>';
         html += '<option value="24"'+(v===24?' selected':'')+'>24</option>';
         html += '<option value="0"'+(v===0?' selected':'')+'>0</option>';
         for(var n=23;n>=1;n--) html += '<option value="'+n+'"'+(v===n?' selected':'')+'>'+n+'</option>';
         html += '</select>';
-        html += '<button class="btn-adj" onclick="adj('+i+',-1)">\u2212</button>';
-        html += '<span class="radial-val" id="rv'+i+'">'+v+'</span>';
         html += '<button class="btn-adj" onclick="adj('+i+',1)">+</button>';
         html += '<button class="'+nc+'" id="nb'+i+'" onclick="openReasonModal('+i+')">\u270E</button>';
         html += '</div></div>';
@@ -219,7 +219,6 @@ function adj(idx, d) {
     var v = (radialValues[idx]||0)+d;
     if (v<0) v=0; if (v>24) v=24;
     radialValues[idx]=v;
-    document.getElementById("rv"+idx).textContent=v;
     document.getElementById("dd"+idx).value=v;
     dataSaved=false; dataSent=false;
     updateTotal(); updateStatus();
@@ -230,7 +229,6 @@ function adj(idx, d) {
 function ddChange(idx) {
     var v = parseInt(document.getElementById("dd"+idx).value);
     radialValues[idx]=v;
-    document.getElementById("rv"+idx).textContent=v;
     dataSaved=false; dataSent=false;
     updateTotal(); updateStatus();
     var nb = document.getElementById("nb"+idx);
