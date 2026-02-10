@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5fb0c9">
+    <title>Settings - HF Radar</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+    <button class="topbar-menu-btn" id="menuToggle"><span></span><span></span><span></span></button>
+    <div class="topbar-title">HF Radar</div>
+</div>
+
+<div id="sideMenu" class="side-menu">
+    <div class="side-menu-header"><h4>HF Radar</h4><p>Field Data Collection</p></div>
+    <ul class="side-menu-list">
+        <li><a href="index.html" data-page="siteReport">Site Report</a></li>
+        <li><a href="attendance.html" data-page="attendance">Attendance</a></li>
+        <li><a href="verify.html" data-page="verify">Verify Data</a></li>
+        <li><a href="history.html" data-page="history">History</a></li>
+        <li><a href="settings.html" data-page="settings">Settings</a></li>
+    </ul>
+</div>
+<div id="overlay" class="overlay"></div>
+
+<div class="page">
+    <div class="page-title-bar"><h4>Settings</h4></div>
+    <div class="page-body">
+        <div class="card">
+            <div class="field">
+                <label>App Password</label>
+                <input type="password" id="settingsPwd" placeholder="Enter password">
+            </div>
+            <div class="field">
+                <label>Server URL <span id="urlLockIcon" onclick="toggleLock()" style="cursor:pointer;">&#128274;</span></label>
+                <input type="text" id="settingsUrl" disabled placeholder="Server URL">
+                <small style="color:#999;">Tap lock to edit (requires admin password)</small>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="syncSites()" style="margin-top:12px;">Update Site List from Server</button>
+            <p id="sitesStatus" style="margin-top:8px;font-size:12px;color:#666;">Sites: Using default list</p>
+            <button class="btn btn-warning btn-full" onclick="saveSett()" style="margin-top:12px;">Save Settings</button>
+            <div id="settingsMsg" style="margin-top:10px;text-align:center;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Password Modal -->
+<div id="passwordModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <h4 id="pwdModalTitle">Authorization Required</h4>
+        <p id="pwdModalMsg" style="color:#666;"></p>
+        <input type="password" id="pwdModalInput" placeholder="Enter password" style="margin:15px 0;">
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closePasswordModal(false)">Cancel</button>
+            <button class="btn btn-primary" onclick="closePasswordModal(true)">OK</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast-msg"></div>
+
+<script src="js/shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    initNav("settings");
+    document.getElementById("settingsUrl").value = getServerUrl();
+    document.getElementById("settingsPwd").value = getAppPassword();
+    updateSitesInfo();
+});
+
+function updateSitesInfo() {
+    var sites=getSitesList(), stored=localStorage.getItem("hfr_sites_list");
+    document.getElementById("sitesStatus").textContent = stored
+        ? "Sites: "+sites.length+" loaded ("+sites.join(", ")+")"
+        : "Sites: Using default list";
+}
+
+function saveSett() {
+    var pwd=document.getElementById("settingsPwd").value.trim();
+    var url=document.getElementById("settingsUrl").value.trim();
+    if(!pwd){showToast("Password cannot be empty");return;}
+    if(!url){showToast("Server URL cannot be empty");return;}
+    if(url.charAt(url.length-1)==="/") url=url.substring(0,url.length-1);
+    localStorage.setItem("hfr_app_pwd",pwd);
+    localStorage.setItem("hfr_server_url",url);
+    document.getElementById("settingsMsg").innerHTML='<span style="color:green;">Settings saved!</span>';
+    showToast("Settings saved");
+}
+
+function toggleLock() {
+    var inp=document.getElementById("settingsUrl");
+    if(inp.disabled){
+        showPasswordModal("Unlock URL","Enter admin password to edit server URL.",function(pwd){
+            if(pwd===ADMIN_PWD){inp.disabled=false;document.getElementById("urlLockIcon").innerHTML="&#128275;";showToast("URL unlocked");}
+            else if(pwd!==null) showToast("Incorrect password");
+        });
+    } else {inp.disabled=true;document.getElementById("urlLockIcon").innerHTML="&#128274;";}
+}
+
+function syncSites() {
+    apiPost(getServerUrl()+"/getConfig",{},function(resp){
+        if(resp&&resp.sites&&resp.sites.length>0){
+            localStorage.setItem("hfr_sites_list",JSON.stringify(resp.sites));
+            updateSitesInfo();
+            showToast("Sites updated: "+resp.sites.length+" sites");
+        } else { showToast("No sites received"); }
+    },function(err){ showToast("Error: "+err); });
+}
+</script>
+</body>
+</html>

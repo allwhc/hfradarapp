@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5fb0c9">
+    <title>Verify Data - HF Radar</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+    <button class="topbar-menu-btn" id="menuToggle"><span></span><span></span><span></span></button>
+    <div class="topbar-title">HF Radar</div>
+</div>
+
+<div id="sideMenu" class="side-menu">
+    <div class="side-menu-header"><h4>HF Radar</h4><p>Field Data Collection</p></div>
+    <ul class="side-menu-list">
+        <li><a href="index.html" data-page="siteReport">Site Report</a></li>
+        <li><a href="attendance.html" data-page="attendance">Attendance</a></li>
+        <li><a href="verify.html" data-page="verify">Verify Data</a></li>
+        <li><a href="history.html" data-page="history">History</a></li>
+        <li><a href="settings.html" data-page="settings">Settings</a></li>
+    </ul>
+</div>
+<div id="overlay" class="overlay"></div>
+
+<div class="page">
+    <div class="page-title-bar"><h4>Verify Data</h4></div>
+    <div class="page-body">
+        <div class="card">
+            <div class="row-3">
+                <div class="field"><label>Month</label><select id="vMonth"></select></div>
+                <div class="field"><label>Year</label><select id="vYear"></select></div>
+                <div class="field" style="padding-top:22px;">
+                    <button class="btn btn-primary btn-full" onclick="fetchData()">Fetch</button>
+                </div>
+            </div>
+        </div>
+        <div id="vLoading" style="display:none; text-align:center; padding:30px;">
+            <div class="spinner"></div><p style="color:#666; margin-top:10px;">Fetching data...</p>
+        </div>
+        <div id="vResult" style="display:none;">
+            <div class="table-scroll"><table id="vTable" class="verify-table"></table></div>
+        </div>
+        <div id="vError" style="display:none;" class="result-box result-error"></div>
+    </div>
+</div>
+
+<!-- Password Modal -->
+<div id="passwordModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <h4 id="pwdModalTitle">Authorization Required</h4>
+        <p id="pwdModalMsg" style="color:#666;"></p>
+        <input type="password" id="pwdModalInput" placeholder="Enter password" style="margin:15px 0;">
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closePasswordModal(false)">Cancel</button>
+            <button class="btn btn-primary" onclick="closePasswordModal(true)">OK</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast-msg"></div>
+
+<script src="js/shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    initNav("verify");
+    var prev = getPrevMonthYear();
+    var mh=""; for(var i=1;i<=12;i++) mh+='<option value="'+i+'"'+(i===prev.month?' selected':'')+'>'+MONTH_NAMES[i-1]+'</option>';
+    document.getElementById("vMonth").innerHTML=mh;
+    var curY=new Date().getFullYear(), yh="";
+    for(var y=curY;y>=curY-4;y--) yh+='<option value="'+y+'"'+(y===prev.year?' selected':'')+'>'+y+'</option>';
+    document.getElementById("vYear").innerHTML=yh;
+});
+
+function fetchData() {
+    var month=document.getElementById("vMonth").value, year=document.getElementById("vYear").value;
+    var prev=getPrevMonthYear();
+    if(parseInt(month)!==prev.month||parseInt(year)!==prev.year){
+        showPasswordModal("Authorization Required","Enter admin password to view "+MONTH_NAMES[parseInt(month)-1]+" "+year,function(pwd){
+            if(pwd===ADMIN_PWD) doFetch(month,year);
+            else if(pwd!==null) showToast("Incorrect password");
+        });
+    } else { doFetch(month,year); }
+}
+
+function doFetch(month,year) {
+    document.getElementById("vLoading").style.display="block";
+    document.getElementById("vResult").style.display="none";
+    document.getElementById("vError").style.display="none";
+    apiPost(getServerUrl()+"/getalldatabymon",{mon:month,yr:year},function(resp){
+        document.getElementById("vLoading").style.display="none";
+        if(!resp||!resp.rcnt||!resp.idlist){
+            document.getElementById("vError").style.display="block";
+            document.getElementById("vError").innerHTML='<h5>No Data</h5><p>No data found for this period.</p>';
+            return;
+        }
+        buildTable(resp); document.getElementById("vResult").style.display="block";
+    },function(err){
+        document.getElementById("vLoading").style.display="none";
+        document.getElementById("vError").style.display="block";
+        document.getElementById("vError").innerHTML='<h5>Error</h5><p>'+err+'</p>';
+    });
+}
+
+function buildTable(resp) {
+    var sites=resp.idlist||[], rows=resp.rcnt||[];
+    var h='<thead><tr><th>Day</th>';
+    for(var s=0;s<sites.length;s++) h+='<th>'+sites[s]+'</th>';
+    h+='</tr></thead><tbody>';
+    for(var r=0;r<rows.length;r++){
+        var last=(r===rows.length-1);
+        var rs=""; if(last) rs=' style="background:#4CAF50;color:#fff;font-weight:bold;"'; else if(r%2===0) rs=' style="background:#E3F2FD;"';
+        h+='<tr'+rs+'><td style="font-weight:bold;">'+(last?'%':(r+1))+'</td>';
+        var rd=rows[r];
+        if(typeof rd==="string"){try{rd=JSON.parse(rd);}catch(e){rd=[rd];}}
+        if(!Array.isArray(rd)) rd=[rd];
+        for(var c=0;c<sites.length;c++){
+            var v=(c<rd.length)?rd[c]:"";
+            var cs="";
+            if(last&&v!==""){var pct=parseFloat(v);if(pct>=70)cs=' style="background:#80FF00;color:#000;"';else if(pct>=50)cs=' style="background:#FFFF66;color:#000;"';else cs=' style="background:#FF9933;color:#000;"';}
+            h+='<td'+cs+'>'+v+'</td>';
+        }
+        h+='</tr>';
+    }
+    h+='</tbody>';
+    document.getElementById("vTable").innerHTML=h;
+}
+</script>
+</body>
+</html>

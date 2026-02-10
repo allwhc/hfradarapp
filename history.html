@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5fb0c9">
+    <title>History - HF Radar</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+    <button class="topbar-menu-btn" id="menuToggle"><span></span><span></span><span></span></button>
+    <div class="topbar-title">HF Radar</div>
+</div>
+
+<div id="sideMenu" class="side-menu">
+    <div class="side-menu-header"><h4>HF Radar</h4><p>Field Data Collection</p></div>
+    <ul class="side-menu-list">
+        <li><a href="index.html" data-page="siteReport">Site Report</a></li>
+        <li><a href="attendance.html" data-page="attendance">Attendance</a></li>
+        <li><a href="verify.html" data-page="verify">Verify Data</a></li>
+        <li><a href="history.html" data-page="history">History</a></li>
+        <li><a href="settings.html" data-page="settings">Settings</a></li>
+    </ul>
+</div>
+<div id="overlay" class="overlay"></div>
+
+<div class="page">
+    <div class="page-title-bar"><h4>Transmission History</h4></div>
+    <div class="page-body">
+        <div id="historyList"></div>
+    </div>
+</div>
+
+<div id="toast" class="toast-msg"></div>
+
+<script src="js/shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    initNav("history");
+    loadHistory();
+});
+
+function loadHistory() {
+    var history = JSON.parse(localStorage.getItem("hfr_history") || "[]");
+    var el = document.getElementById("historyList");
+    if (history.length === 0) {
+        el.innerHTML = '<p style="text-align:center;color:#999;padding:40px 20px;">No history yet. Send data from Site Report to see transmission history here.</p>';
+        return;
+    }
+    var h = "";
+    for (var i = 0; i < history.length; i++) {
+        var r = history[i];
+        var ic = r.success ? "success" : "failed";
+        var sym = r.success ? "&#10003;" : "&#10007;";
+        var mn = MONTH_NAMES[(r.month || 1) - 1] || "";
+        h += '<div class="history-card">';
+        h += '<div class="history-icon '+ic+'">'+sym+'</div>';
+        h += '<div class="history-info">';
+        h += '<div class="hi-title">'+r.site+' - '+mn+' '+r.year+'</div>';
+        h += '<div class="hi-sub">'+r.timestamp+' | '+r.method+'</div>';
+        h += '</div>';
+        h += '<div class="history-total">'+r.total+'</div>';
+        h += '</div>';
+    }
+    el.innerHTML = h;
+}
+</script>
+</body>
+</html>

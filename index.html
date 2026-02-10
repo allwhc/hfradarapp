@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5fb0c9">
+    <title>Site Report - HF Radar</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+    <button class="topbar-menu-btn" id="menuToggle"><span></span><span></span><span></span></button>
+    <div class="topbar-title">HF Radar</div>
+    <div class="topbar-status" id="navStatus"></div>
+</div>
+
+<!-- Side Menu -->
+<div id="sideMenu" class="side-menu">
+    <div class="side-menu-header"><h4>HF Radar</h4><p>Field Data Collection</p></div>
+    <ul class="side-menu-list">
+        <li><a href="index.html" data-page="siteReport">Site Report</a></li>
+        <li><a href="attendance.html" data-page="attendance">Attendance</a></li>
+        <li><a href="verify.html" data-page="verify">Verify Data</a></li>
+        <li><a href="history.html" data-page="history">History</a></li>
+        <li><a href="settings.html" data-page="settings">Settings</a></li>
+    </ul>
+</div>
+<div id="overlay" class="overlay"></div>
+
+<!-- Page -->
+<div class="page">
+    <div class="page-title-bar"><h4>Site Report</h4></div>
+    <div class="page-body">
+
+        <!-- QR Scan -->
+        <div class="card">
+            <button class="btn btn-primary btn-full" id="btnScanQR" onclick="startQRScan()">Scan QR Code</button>
+        </div>
+
+        <div class="divider-text">OR enter manually</div>
+
+        <!-- Month / Year / Site -->
+        <div class="card">
+            <div class="row-3">
+                <div class="field"><label>Month</label><select id="selMonth" onchange="onSelectionChange()"></select></div>
+                <div class="field"><label>Year</label><select id="selYear" onchange="onSelectionChange()"></select></div>
+                <div class="field"><label>Site</label><select id="selSite" onchange="onSelectionChange()"></select></div>
+            </div>
+        </div>
+
+        <!-- Total -->
+        <div class="card total-bar">
+            <div class="total-left">
+                <span class="total-label">Total Radial</span>
+                <span class="total-value" id="totalRadial">0</span>
+            </div>
+            <div class="total-right">
+                <span id="dataStatus" class="status-badge" style="display:none;"></span>
+                <button class="btn btn-small btn-outline" onclick="resetData()">Reset</button>
+            </div>
+        </div>
+
+        <!-- Day Grid -->
+        <div id="dayGrid" class="day-grid"></div>
+
+        <!-- Save / Send -->
+        <div class="action-row">
+            <button class="btn btn-warning btn-half" onclick="saveData()">SAVE</button>
+            <button class="btn btn-success btn-half" id="btnSend" onclick="sendData()" disabled>SEND</button>
+        </div>
+    </div>
+</div>
+
+<!-- QR Scanner Fullscreen -->
+<div id="qrModal" class="qr-fullscreen" style="display:none;">
+    <div class="qr-topbar"><span>Scan QR Code</span><button onclick="stopQRScan()">Close</button></div>
+    <div class="qr-video-wrap">
+        <video id="qrVideo" playsinline autoplay muted></video>
+        <canvas id="qrCanvas" style="display:none;"></canvas>
+        <div class="qr-guide"></div>
+    </div>
+    <p id="qrStatus" class="qr-status">Point camera at QR code...</p>
+</div>
+
+<!-- Reason Modal -->
+<div id="reasonModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <h4 style="margin-bottom:15px;">Select Reason</h4>
+        <p style="color:#666; font-size:13px;">Day <span id="reasonDayLabel"></span> — Radial: <span id="reasonRadialLabel"></span></p>
+        <div id="reasonOptions" class="reason-options"></div>
+        <div id="reasonCustomDiv" style="display:none; margin-top:10px;">
+            <input type="text" id="reasonCustomText" placeholder="Enter custom reason...">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeReasonModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveReason()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Password Modal -->
+<div id="passwordModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <h4 id="pwdModalTitle">Authorization Required</h4>
+        <p id="pwdModalMsg" style="color:#666;"></p>
+        <input type="password" id="pwdModalInput" placeholder="Enter password" style="margin:15px 0;">
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closePasswordModal(false)">Cancel</button>
+            <button class="btn btn-primary" onclick="closePasswordModal(true)">OK</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast-msg"></div>
+
+<script src="js/jsQR.js"></script>
+<script src="js/shared.js"></script>
+<script>
+// ===== STATE =====
+var radialValues = [];
+var reasons = [];
+var currentReasonDay = -1;
+var dataSaved = false;
+var dataSent = false;
+var qrSourceType = "Manual";
+var qrVideoStream = null;
+var qrScanTimer = null;
+
+var REASONS_LIST = [
+    "Radar System Problem","Macmini Not Working","Generator Not Working",
+    "UPS Not Working","Stabilizer Not Working","No Diesel",
+    "No Electricity For Long","Antenna Fall Down","AC Failed",
+    "System Service/Repair/APM","Other"
+];
+
+// ===== INIT =====
+document.addEventListener("DOMContentLoaded", function() {
+    initNav("siteReport");
+    initDropdowns();
+    loadSavedData();
+});
+
+function initDropdowns() {
+    var prev = getPrevMonthYear();
+
+    var mh = "";
+    for (var i = 1; i <= 12; i++) {
+        mh += '<option value="'+i+'"'+(i===prev.month?' selected':'')+'>'+MONTH_NAMES[i-1]+'</option>';
+    }
+    document.getElementById("selMonth").innerHTML = mh;
+
+    var curY = new Date().getFullYear();
+    var yh = "";
+    for (var y = curY; y >= curY-4; y--) {
+        yh += '<option value="'+y+'"'+(y===prev.year?' selected':'')+'>'+y+'</option>';
+    }
+    document.getElementById("selYear").innerHTML = yh;
+
+    var sites = getSitesList();
+    var sh = '<option value="">Select Site</option>';
+    for (var s = 0; s < sites.length; s++) sh += '<option value="'+sites[s]+'">'+sites[s]+'</option>';
+    document.getElementById("selSite").innerHTML = sh;
+
+    var last = localStorage.getItem("hfr_last_site");
+    if (last) document.getElementById("selSite").value = last;
+
+    buildDayGrid();
+}
+
+function onSelectionChange() {
+    var site = document.getElementById("selSite").value;
+    if (site) localStorage.setItem("hfr_last_site", site);
+    dataSaved = false; dataSent = false; qrSourceType = "Manual";
+    if (!loadSavedData()) { radialValues = []; reasons = []; buildDayGrid(); }
+}
+
+// ===== DAY GRID =====
+function buildDayGrid() {
+    var month = parseInt(document.getElementById("selMonth").value);
+    var year = parseInt(document.getElementById("selYear").value);
+    if (!month || !year) return;
+    var days = getDaysInMonth(month, year);
+
+    if (radialValues.length !== days) {
+        radialValues = []; reasons = [];
+        for (var k = 0; k < days; k++) { radialValues.push(0); reasons.push(""); }
+    }
+
+    var html = "";
+    for (var i = 0; i < days; i++) {
+        var dn = i+1, name = getDayName(year, month, dn);
+        var v = radialValues[i]||0;
+        var hr = reasons[i] && reasons[i]!=="";
+        var nc = v>=24 ? "btn-note hidden" : (hr ? "btn-note has-reason" : "btn-note");
+
+        html += '<div class="day-row'+(i%2===0?' alt':'')+'">';
+        html += '<div class="day-info"><div class="day-date">'+dn+'/'+month+'/'+year+'</div>';
+        html += '<div class="day-name">Day '+dn+' ('+name+')</div></div>';
+        html += '<div class="day-controls">';
+        html += '<button class="btn-adj" onclick="adj('+i+',-1)">\u2212</button>';
+        html += '<span class="radial-val" id="rv'+i+'">'+v+'</span>';
+        html += '<button class="btn-adj" onclick="adj('+i+',1)">+</button>';
+        html += '<button class="'+nc+'" id="nb'+i+'" onclick="openReasonModal('+i+')">\u270E</button>';
+        html += '</div></div>';
+    }
+    document.getElementById("dayGrid").innerHTML = html;
+    updateTotal(); updateStatus();
+}
+
+function adj(idx, d) {
+    var v = (radialValues[idx]||0)+d;
+    if (v<0) v=0; if (v>24) v=24;
+    radialValues[idx]=v;
+    document.getElementById("rv"+idx).textContent=v;
+    dataSaved=false; dataSent=false;
+    updateTotal(); updateStatus();
+    var nb = document.getElementById("nb"+idx);
+    if (v>=24) { nb.className="btn-note hidden"; reasons[idx]=""; }
+    else { nb.className = (reasons[idx]&&reasons[idx]!=="") ? "btn-note has-reason" : "btn-note"; }
+}
+
+function updateTotal() {
+    var t=0; for(var i=0;i<radialValues.length;i++) t+=(radialValues[i]||0);
+    document.getElementById("totalRadial").textContent=t;
+}
+
+function updateStatus() {
+    var b=document.getElementById("dataStatus"), s=document.getElementById("btnSend");
+    if(dataSent){b.style.display="inline-block";b.className="status-badge status-sent";b.textContent="Sent";s.disabled=true;}
+    else if(dataSaved){b.style.display="inline-block";b.className="status-badge status-saved";b.textContent="Saved";s.disabled=false;}
+    else{b.style.display="none";s.disabled=true;}
+}
+
+// ===== REASON MODAL =====
+function openReasonModal(idx) {
+    currentReasonDay=idx;
+    var m=parseInt(document.getElementById("selMonth").value), y=parseInt(document.getElementById("selYear").value);
+    document.getElementById("reasonDayLabel").textContent=(idx+1)+"/"+m+"/"+y;
+    document.getElementById("reasonRadialLabel").textContent=radialValues[idx]||0;
+    var cur=reasons[idx]||"";
+    var isCustom=cur!==""&&REASONS_LIST.indexOf(cur)===-1&&cur!=="Other";
+    var h="";
+    for(var r=0;r<REASONS_LIST.length;r++){
+        var sel=(REASONS_LIST[r]===cur||(REASONS_LIST[r]==="Other"&&isCustom))?" selected":"";
+        h+='<button class="reason-option'+sel+'" data-reason="'+REASONS_LIST[r]+'" onclick="selReason(this)">'+REASONS_LIST[r]+'</button>';
+    }
+    document.getElementById("reasonOptions").innerHTML=h;
+    document.getElementById("reasonCustomDiv").style.display=isCustom?"block":"none";
+    document.getElementById("reasonCustomText").value=isCustom?cur:"";
+    document.getElementById("reasonModal").style.display="flex";
+}
+function selReason(btn) {
+    var opts=document.querySelectorAll(".reason-option");
+    for(var i=0;i<opts.length;i++) opts[i].classList.remove("selected");
+    btn.classList.add("selected");
+    if(btn.getAttribute("data-reason")==="Other"){
+        document.getElementById("reasonCustomDiv").style.display="block";
+        setTimeout(function(){document.getElementById("reasonCustomText").focus();},100);
+    } else { document.getElementById("reasonCustomDiv").style.display="none"; }
+}
+function saveReason() {
+    var sel=document.querySelector(".reason-option.selected");
+    if(!sel){reasons[currentReasonDay]="";}
+    else{
+        var v=sel.getAttribute("data-reason");
+        if(v==="Other"){var c=document.getElementById("reasonCustomText").value.trim();reasons[currentReasonDay]=c?("Other: "+c):"Other";}
+        else{reasons[currentReasonDay]=v;}
+    }
+    var nb=document.getElementById("nb"+currentReasonDay);
+    nb.className=reasons[currentReasonDay]?"btn-note has-reason":"btn-note";
+    dataSaved=false; updateStatus(); closeReasonModal();
+}
+function closeReasonModal() { document.getElementById("reasonModal").style.display="none"; currentReasonDay=-1; }
+
+// ===== SAVE / SEND =====
+function storageKey() {
+    return "hfr_data_"+document.getElementById("selSite").value+"_"+document.getElementById("selMonth").value+"_"+document.getElementById("selYear").value;
+}
+function saveData() {
+    var site=document.getElementById("selSite").value;
+    if(!site){showToast("Please select a site");return;}
+    var t=0; for(var i=0;i<radialValues.length;i++) t+=(radialValues[i]||0);
+    if(!confirm("Total Radial Count: "+t+"\n\nIs this correct?")) return;
+    localStorage.setItem(storageKey(), JSON.stringify({
+        site:site, month:document.getElementById("selMonth").value,
+        year:document.getElementById("selYear").value,
+        radials:radialValues.slice(), reasons:reasons.slice(),
+        total:t, sent:false, source:qrSourceType, savedAt:new Date().toISOString()
+    }));
+    dataSaved=true; dataSent=false; updateStatus(); showToast("Data saved locally");
+}
+function loadSavedData() {
+    var d=localStorage.getItem(storageKey());
+    if(d){try{var o=JSON.parse(d);radialValues=o.radials||[];reasons=o.reasons||[];dataSaved=true;dataSent=o.sent||false;qrSourceType=o.source||"Manual";buildDayGrid();return true;}catch(e){}}
+    return false;
+}
+function sendData() {
+    var site=document.getElementById("selSite").value;
+    var month=parseInt(document.getElementById("selMonth").value);
+    var year=parseInt(document.getElementById("selYear").value);
+    if(!site){showToast("Please select a site");return;}
+    if(!dataSaved){showToast("Please save data first");return;}
+    var t=0; for(var i=0;i<radialValues.length;i++) t+=(radialValues[i]||0);
+    var prev=getPrevMonthYear();
+    if(month!==prev.month||year!==prev.year){
+        showPasswordModal("Authorization Required","Enter admin password to send data for "+MONTH_NAMES[month-1]+" "+year,function(pwd){
+            if(pwd===ADMIN_PWD) doSend(site,month,year,t);
+            else if(pwd!==null) showToast("Incorrect password");
+        });
+    } else {
+        if(confirm("Site: "+site+"\nMonth: "+MONTH_NAMES[month-1]+" "+year+"\nTotal: "+t+"\n\nSend this data?"))
+            doSend(site,month,year,t);
+    }
+}
+function doSend(site,month,year,total) {
+    var days=getDaysInMonth(month,year), cred1=[];
+    for(var i=0;i<days;i++){
+        var dn=i+1, mm=month<10?"0"+month:""+month, dd=dn<10?"0"+dn:""+dn;
+        var e={id:site,dt:year+"-"+mm+"-"+dd,rc:String(radialValues[i]||0),rchex:""};
+        if(reasons[i]&&reasons[i]!=="") e.reason=reasons[i];
+        cred1.push(e);
+    }
+    showToast("Sending data..."); document.getElementById("btnSend").disabled=true;
+    apiPost(getServerUrl()+"/upldTsuData",{source_type:qrSourceType,cred1:cred1},function(resp){
+        dataSent=true;
+        var k=storageKey(),s=localStorage.getItem(k);
+        if(s){var o=JSON.parse(s);o.sent=true;localStorage.setItem(k,JSON.stringify(o));}
+        updateStatus(); showToast("Data sent successfully!");
+        addHistory(site,month,year,total,qrSourceType,true);
+    },function(err){
+        document.getElementById("btnSend").disabled=false;
+        showToast("Send failed: "+err);
+        addHistory(site,month,year,total,qrSourceType,false);
+    });
+}
+function addHistory(site,month,year,total,method,success) {
+    var h=JSON.parse(localStorage.getItem("hfr_history")||"[]");
+    h.unshift({site:site,month:month,year:year,total:total,method:method==="QR"?"QR Code Scan":"Manual Entry",success:success,timestamp:new Date().toLocaleString()});
+    if(h.length>50)h=h.slice(0,50);
+    localStorage.setItem("hfr_history",JSON.stringify(h));
+}
+function resetData() {
+    if(!confirm("Reset all radial values to 0?")) return;
+    var d=radialValues.length; radialValues=[]; reasons=[];
+    for(var i=0;i<d;i++){radialValues.push(0);reasons.push("");}
+    dataSaved=false;dataSent=false;qrSourceType="Manual";buildDayGrid();showToast("All values reset");
+}
+
+// ===== QR SCANNER (native getUserMedia + jsQR) =====
+function startQRScan() {
+    var modal=document.getElementById("qrModal"), video=document.getElementById("qrVideo"), st=document.getElementById("qrStatus");
+    modal.style.display="flex"; st.textContent="Starting camera...";
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent="Camera not supported on this browser.";return;}
+    navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}})
+    .then(function(stream){
+        qrVideoStream=stream; video.srcObject=stream; video.setAttribute("playsinline","true"); video.play();
+        st.textContent="Point camera at QR code...";
+        video.addEventListener("loadedmetadata",function(){scanLoop();});
+    })
+    .catch(function(err){st.textContent="Camera error: "+err.message;});
+}
+function scanLoop() {
+    var video=document.getElementById("qrVideo"), canvas=document.getElementById("qrCanvas"), ctx=canvas.getContext("2d");
+    function tick(){
+        if(!qrVideoStream) return;
+        if(video.readyState===video.HAVE_ENOUGH_DATA){
+            canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+            ctx.drawImage(video,0,0,canvas.width,canvas.height);
+            var img=ctx.getImageData(0,0,canvas.width,canvas.height);
+            var code=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+            if(code&&code.data){stopQRScan();processQR(code.data);return;}
+        }
+        qrScanTimer=requestAnimationFrame(tick);
+    }
+    qrScanTimer=requestAnimationFrame(tick);
+}
+function stopQRScan() {
+    if(qrScanTimer){cancelAnimationFrame(qrScanTimer);qrScanTimer=null;}
+    if(qrVideoStream){var t=qrVideoStream.getTracks();for(var i=0;i<t.length;i++)t[i].stop();qrVideoStream=null;}
+    document.getElementById("qrVideo").srcObject=null;
+    document.getElementById("qrModal").style.display="none";
+}
+function processQR(str) {
+    var p=str.split(":");
+    if(p.length<4){showToast("Invalid QR format");return;}
+    var qSite=p[0],qM=parseInt(p[1]),qY=parseInt(p[2]);
+    if(isNaN(qM)||isNaN(qY)||qM<1||qM>12){showToast("Invalid QR data");return;}
+    var days=getDaysInMonth(qM,qY), vals=[], tot=0;
+    for(var i=0;i<days;i++){
+        var idx=3+i, v=0;
+        if(idx<p.length){var s=p[idx]; v=(s.indexOf("0x")===0||s.indexOf("0X")===0)?0:(parseInt(s)||0);}
+        if(v<0)v=0;if(v>24)v=24; vals.push(v); tot+=v;
+    }
+    var tIdx=3+days;
+    if(tIdx<p.length){var exp=parseInt(p[tIdx]);if(!isNaN(exp)&&exp!==tot){showToast("QR validation failed!");return;}}
+    // Match site
+    var sites=getSitesList(), matched=qSite;
+    for(var s=0;s<sites.length;s++){if(sites[s].toLowerCase()===qSite.toLowerCase()){matched=sites[s];break;}}
+    document.getElementById("selMonth").value=qM;
+    document.getElementById("selYear").value=qY;
+    document.getElementById("selSite").value=matched;
+    radialValues=vals; reasons=[];
+    for(var j=0;j<days;j++) reasons.push("");
+    dataSaved=false;dataSent=false;qrSourceType="QR";
+    buildDayGrid(); showToast("QR data loaded (Total: "+tot+"). Edit before saving.");
+}
+</script>
+</body>
+</html>

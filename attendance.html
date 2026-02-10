@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5fb0c9">
+    <title>Attendance - HF Radar</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+    <button class="topbar-menu-btn" id="menuToggle"><span></span><span></span><span></span></button>
+    <div class="topbar-title">HF Radar</div>
+</div>
+
+<div id="sideMenu" class="side-menu">
+    <div class="side-menu-header"><h4>HF Radar</h4><p>Field Data Collection</p></div>
+    <ul class="side-menu-list">
+        <li><a href="index.html" data-page="siteReport">Site Report</a></li>
+        <li><a href="attendance.html" data-page="attendance">Attendance</a></li>
+        <li><a href="verify.html" data-page="verify">Verify Data</a></li>
+        <li><a href="history.html" data-page="history">History</a></li>
+        <li><a href="settings.html" data-page="settings">Settings</a></li>
+    </ul>
+</div>
+<div id="overlay" class="overlay"></div>
+
+<div class="page">
+    <div class="page-title-bar"><h4>Mark Attendance</h4></div>
+    <div class="page-body">
+        <div class="card">
+            <div class="field">
+                <label>Your Name</label>
+                <input type="text" id="attName" placeholder="Enter your name">
+            </div>
+            <div class="field">
+                <label>Select Site</label>
+                <select id="attSite"><option value="">-- Select Site --</option></select>
+            </div>
+            <button class="btn btn-success btn-full" id="btnMark" onclick="markAttendance()" style="margin-top:15px;">
+                Mark My Attendance
+            </button>
+        </div>
+        <div id="attLoading" style="display:none; text-align:center; padding:20px;">
+            <div class="spinner"></div>
+            <p style="color:#666; margin-top:10px;">Submitting attendance...</p>
+        </div>
+        <div id="attResult" style="display:none;" class="result-box"></div>
+    </div>
+</div>
+
+<div id="toast" class="toast-msg"></div>
+
+<script src="js/shared.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    initNav("attendance");
+    var sites = getSitesList();
+    var h = '<option value="">-- Select Site --</option>';
+    for (var i=0; i<sites.length; i++) h += '<option value="'+sites[i]+'">'+sites[i]+'</option>';
+    document.getElementById("attSite").innerHTML = h;
+    var sn = localStorage.getItem("hfr_att_name");
+    var ss = localStorage.getItem("hfr_att_site");
+    if (sn) document.getElementById("attName").value = sn;
+    if (ss) document.getElementById("attSite").value = ss;
+});
+
+function markAttendance() {
+    var name = document.getElementById("attName").value.trim();
+    var site = document.getElementById("attSite").value;
+    if (!name) { showToast("Please enter your name"); return; }
+    if (!site) { showToast("Please select a site"); return; }
+    localStorage.setItem("hfr_att_name", name);
+    localStorage.setItem("hfr_att_site", site);
+    document.getElementById("btnMark").disabled = true;
+    document.getElementById("attLoading").style.display = "block";
+    document.getElementById("attResult").style.display = "none";
+
+    if (!navigator.geolocation) { submit(name, site, 0, 0); return; }
+    navigator.geolocation.getCurrentPosition(
+        function(pos) { submit(name, site, pos.coords.latitude, pos.coords.longitude); },
+        function() { submit(name, site, 0, 0); },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 120000 }
+    );
+}
+
+function submit(name, site, lat, lng) {
+    apiPost(getServerUrl()+"/markAttendance", {staff_name:name,site_code:site,latitude:lat,longitude:lng}, function(resp) {
+        document.getElementById("btnMark").disabled = false;
+        document.getElementById("attLoading").style.display = "none";
+        var el = document.getElementById("attResult"); el.style.display = "block";
+        if (resp.stat === "success") {
+            el.className = "result-box result-success";
+            el.innerHTML = '<h5>Attendance Marked!</h5><p>Time: '+(resp.timestamp||"")+'</p>';
+        } else {
+            el.className = "result-box result-error";
+            el.innerHTML = '<h5>Could Not Mark Attendance</h5><p>'+(resp.msg||"Unknown error")+'</p>';
+        }
+    }, function(err) {
+        document.getElementById("btnMark").disabled = false;
+        document.getElementById("attLoading").style.display = "none";
+        var el = document.getElementById("attResult"); el.style.display = "block";
+        el.className = "result-box result-error";
+        el.innerHTML = '<h5>Error</h5><p>'+err+'</p>';
+    });
+}
+</script>
+</body>
+</html>
