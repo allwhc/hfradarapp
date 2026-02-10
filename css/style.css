@@ -214,6 +214,16 @@ select:focus, input:focus {
     color: #2196F3;
 }
 
+.radial-dd {
+    width: 52px; padding: 4px 2px;
+    border: 1.5px solid #ddd; border-radius: 6px;
+    font-size: 14px; font-weight: 600;
+    text-align: center; color: #333;
+    background: #fff; cursor: pointer;
+    -webkit-appearance: auto; appearance: auto;
+}
+.radial-dd:focus { outline: none; border-color: #5fb0c9; }
+
 .btn-note {
     width: 30px; height: 30px;
     border-radius: 6px; border: 1px solid #ddd;
