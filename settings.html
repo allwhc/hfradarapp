@@ -31,32 +31,20 @@
     <div class="page-title-bar"><h4>Settings</h4></div>
     <div class="page-body">
         <div class="card">
-            <div class="field">
-                <label>App Password</label>
-                <input type="password" id="settingsPwd" placeholder="Enter password">
-            </div>
-            <div class="field">
-                <label>Server URL <span id="urlLockIcon" onclick="toggleLock()" style="cursor:pointer;">&#128274;</span></label>
-                <input type="text" id="settingsUrl" disabled placeholder="Server URL">
-                <small style="color:#999;">Tap lock to edit (requires admin password)</small>
-            </div>
-            <button class="btn btn-primary btn-full" onclick="syncSites()" style="margin-top:12px;">Update Site List from Server</button>
-            <p id="sitesStatus" style="margin-top:8px;font-size:12px;color:#666;">Sites: Using default list</p>
-            <button class="btn btn-warning btn-full" onclick="saveSett()" style="margin-top:12px;">Save Settings</button>
-            <div id="settingsMsg" style="margin-top:10px;text-align:center;"></div>
+            <h4 style="font-size:15px; margin-bottom:12px; color:#333;">Site List</h4>
+            <p id="sitesStatus" style="font-size:13px; color:#666; margin-bottom:12px;"></p>
+            <button class="btn btn-primary btn-full" id="btnSync" onclick="syncSites()">Update Site List from Server</button>
+            <p id="syncMsg" style="margin-top:8px; text-align:center; font-size:13px;"></p>
         </div>
-    </div>
-</div>
 
-<!-- Password Modal -->
-<div id="passwordModal" class="modal-overlay" style="display:none;">
-    <div class="modal-box">
-        <h4 id="pwdModalTitle">Authorization Required</h4>
-        <p id="pwdModalMsg" style="color:#666;"></p>
-        <input type="password" id="pwdModalInput" placeholder="Enter password" style="margin:15px 0;">
-        <div class="modal-actions">
-            <button class="btn btn-outline" onclick="closePasswordModal(false)">Cancel</button>
-            <button class="btn btn-primary" onclick="closePasswordModal(true)">OK</button>
+        <div class="card" style="margin-top:10px;">
+            <h4 style="font-size:15px; margin-bottom:8px; color:#333;">About</h4>
+            <p style="font-size:13px; color:#666;">HF Radar Field App (Web Version)</p>
+            <p style="font-size:12px; color:#999; margin-top:4px;">Server: hfradarsite.pythonanywhere.com</p>
+        </div>
+
+        <div style="margin-top:20px; text-align:center;">
+            <button class="btn btn-outline" onclick="logout()">Logout</button>
         </div>
     </div>
 </div>
@@ -67,48 +55,46 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     initNav("settings");
-    document.getElementById("settingsUrl").value = getServerUrl();
-    document.getElementById("settingsPwd").value = getAppPassword();
     updateSitesInfo();
 });
 
 function updateSitesInfo() {
-    var sites=getSitesList(), stored=localStorage.getItem("hfr_sites_list");
-    document.getElementById("sitesStatus").textContent = stored
-        ? "Sites: "+sites.length+" loaded ("+sites.join(", ")+")"
-        : "Sites: Using default list";
-}
-
-function saveSett() {
-    var pwd=document.getElementById("settingsPwd").value.trim();
-    var url=document.getElementById("settingsUrl").value.trim();
-    if(!pwd){showToast("Password cannot be empty");return;}
-    if(!url){showToast("Server URL cannot be empty");return;}
-    if(url.charAt(url.length-1)==="/") url=url.substring(0,url.length-1);
-    localStorage.setItem("hfr_app_pwd",pwd);
-    localStorage.setItem("hfr_server_url",url);
-    document.getElementById("settingsMsg").innerHTML='<span style="color:green;">Settings saved!</span>';
-    showToast("Settings saved");
-}
-
-function toggleLock() {
-    var inp=document.getElementById("settingsUrl");
-    if(inp.disabled){
-        showPasswordModal("Unlock URL","Enter admin password to edit server URL.",function(pwd){
-            if(pwd===ADMIN_PWD){inp.disabled=false;document.getElementById("urlLockIcon").innerHTML="&#128275;";showToast("URL unlocked");}
-            else if(pwd!==null) showToast("Incorrect password");
-        });
-    } else {inp.disabled=true;document.getElementById("urlLockIcon").innerHTML="&#128274;";}
+    var sites = getSitesList();
+    var stored = localStorage.getItem("hfr_sites_list");
+    var lastSync = localStorage.getItem("hfr_sites_synced");
+    var text = "";
+    if (stored) {
+        text = sites.length + " sites: " + sites.join(", ");
+        if (lastSync) text += "\nLast updated: " + lastSync;
+    } else {
+        text = "Using default list (" + sites.length + " sites)";
+    }
+    document.getElementById("sitesStatus").textContent = text;
 }
 
 function syncSites() {
-    apiPost(getServerUrl()+"/getConfig",{},function(resp){
-        if(resp&&resp.sites&&resp.sites.length>0){
-            localStorage.setItem("hfr_sites_list",JSON.stringify(resp.sites));
+    document.getElementById("btnSync").disabled = true;
+    document.getElementById("syncMsg").innerHTML = '<span style="color:#666;">Fetching...</span>';
+    apiPost(getServerUrl() + "/getConfig", {}, function(resp) {
+        document.getElementById("btnSync").disabled = false;
+        if (resp && resp.sites && resp.sites.length > 0) {
+            localStorage.setItem("hfr_sites_list", JSON.stringify(resp.sites));
+            localStorage.setItem("hfr_sites_synced", new Date().toLocaleString());
             updateSitesInfo();
-            showToast("Sites updated: "+resp.sites.length+" sites");
-        } else { showToast("No sites received"); }
-    },function(err){ showToast("Error: "+err); });
+            document.getElementById("syncMsg").innerHTML = '<span style="color:green;">Updated! ' + resp.sites.length + ' sites loaded.</span>';
+            showToast("Sites updated");
+        } else {
+            document.getElementById("syncMsg").innerHTML = '<span style="color:#ff9800;">No sites received from server.</span>';
+        }
+    }, function(err) {
+        document.getElementById("btnSync").disabled = false;
+        document.getElementById("syncMsg").innerHTML = '<span style="color:#dc3545;">Error: ' + err + '</span>';
+    });
+}
+
+function logout() {
+    sessionStorage.removeItem("hfr_logged_in");
+    window.location.replace("login.html");
 }
 </script>
 </body>

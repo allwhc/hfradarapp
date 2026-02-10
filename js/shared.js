@@ -1,3 +1,8 @@
+// ===== AUTH CHECK =====
+if (sessionStorage.getItem("hfr_logged_in") !== "true") {
+    window.location.replace("login.html");
+}
+
 // ===== CONFIG =====
 var SERVER_URL = "https://hfradarsite.pythonanywhere.com";
 var DEFAULT_SITES = ["Cuda","Kalp","Mach","Yanm","Wasi","Jgri","Gopa","Puri","Ptbl","Htby"];
@@ -6,15 +11,12 @@ var MONTH_NAMES = ["January","February","March","April","May","June","July","Aug
 
 // ===== HELPERS =====
 function getServerUrl() {
-    return localStorage.getItem("hfr_server_url") || SERVER_URL;
+    return SERVER_URL;
 }
 function getSitesList() {
     var stored = localStorage.getItem("hfr_sites_list");
     if (stored) { try { return JSON.parse(stored); } catch(e) {} }
     return DEFAULT_SITES;
-}
-function getAppPassword() {
-    return localStorage.getItem("hfr_app_pwd") || "";
 }
 function getDaysInMonth(month, year) {
     return new Date(year, month, 0).getDate();
