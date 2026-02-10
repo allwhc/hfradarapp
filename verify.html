@@ -102,7 +102,7 @@ function doFetch(month,year) {
     },function(err){
         document.getElementById("vLoading").style.display="none";
         document.getElementById("vError").style.display="block";
-        document.getElementById("vError").innerHTML='<h5>Error</h5><p>'+err+'</p>';
+        document.getElementById("vError").innerHTML='<h5>Error</h5><p>'+err+'</p><p style="font-size:11px;color:#999;margin-top:8px;">If you see "Failed to fetch", update PythonAnywhere server (CORS fix needed).</p>';
     });
 }
 
