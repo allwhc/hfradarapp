@@ -294,7 +294,7 @@ function saveData() {
 }
 function loadSavedData() {
     var d=localStorage.getItem(storageKey());
-    if(d){try{var o=JSON.parse(d);radialValues=o.radials||[];reasons=o.reasons||[];dataSaved=true;dataSent=o.sent||false;qrSourceType=o.source||"Manual";buildDayGrid();return true;}catch(e){}}
+    if(d){try{var o=JSON.parse(d);if(o.sent){return false;}radialValues=o.radials||[];reasons=o.reasons||[];dataSaved=true;dataSent=false;qrSourceType=o.source||"Manual";buildDayGrid();return true;}catch(e){}}
     return false;
 }
 function sendData() {
