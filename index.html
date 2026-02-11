@@ -465,20 +465,15 @@ function fallbackJsQR(file) {
         var img=new Image();
         img.onload=function(){
             var sizes=[img.width, 1200, 800, 600];
+            // Try raw image at multiple scales
             for(var si=0;si<sizes.length;si++){
-                var maxDim=sizes[si];
-                var w=img.width, h=img.height;
-                if(w>maxDim||h>maxDim){
-                    var scale=maxDim/Math.max(w,h);
-                    w=Math.round(w*scale); h=Math.round(h*scale);
-                }
-                var canvas=document.createElement("canvas");
-                canvas.width=w; canvas.height=h;
-                var ctx=canvas.getContext("2d");
-                ctx.drawImage(img,0,0,w,h);
-                var imgData=ctx.getImageData(0,0,w,h);
-                var code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"attemptBoth"});
-                if(code&&code.data){ processQR(code.data); return; }
+                var code=tryJsQRAtSize(img,sizes[si],false);
+                if(code){ processQR(code); return; }
+            }
+            // Try with contrast+threshold preprocessing
+            for(var si2=0;si2<sizes.length;si2++){
+                var code2=tryJsQRAtSize(img,sizes[si2],true);
+                if(code2){ processQR(code2); return; }
             }
             showToast("No QR code found in image");
         };
@@ -486,6 +481,28 @@ function fallbackJsQR(file) {
         img.src=e.target.result;
     };
     reader.readAsDataURL(file);
+}
+function tryJsQRAtSize(img,maxDim,preprocess) {
+    var w=img.width, h=img.height;
+    if(w>maxDim||h>maxDim){
+        var scale=maxDim/Math.max(w,h);
+        w=Math.round(w*scale); h=Math.round(h*scale);
+    }
+    var canvas=document.createElement("canvas");
+    canvas.width=w; canvas.height=h;
+    var ctx=canvas.getContext("2d");
+    ctx.drawImage(img,0,0,w,h);
+    var imgData=ctx.getImageData(0,0,w,h);
+    if(preprocess){
+        var d=imgData.data;
+        for(var i=0;i<d.length;i+=4){
+            var gray=Math.round(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114);
+            gray=gray<128?0:255;
+            d[i]=gray; d[i+1]=gray; d[i+2]=gray;
+        }
+    }
+    var code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"attemptBoth"});
+    return (code&&code.data)?code.data:null;
 }
 </script>
 </body>
