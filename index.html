@@ -379,14 +379,26 @@ function startQRScan() {
 }
 function scanLoop() {
     var video=document.getElementById("qrVideo"), canvas=document.getElementById("qrCanvas"), ctx=canvas.getContext("2d");
+    var useBD=!!window.BarcodeDetector, bd=useBD?new BarcodeDetector({formats:["qr_code"]}):null, scanning=false;
     function tick(){
         if(!qrVideoStream) return;
         if(video.readyState===video.HAVE_ENOUGH_DATA){
-            canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-            ctx.drawImage(video,0,0,canvas.width,canvas.height);
-            var img=ctx.getImageData(0,0,canvas.width,canvas.height);
-            var code=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
-            if(code&&code.data){stopQRScan();processQR(code.data);return;}
+            if(useBD&&!scanning){
+                scanning=true;
+                bd.detect(video).then(function(codes){
+                    scanning=false;
+                    if(codes&&codes.length>0&&codes[0].rawValue){stopQRScan();processQR(codes[0].rawValue);return;}
+                    qrScanTimer=requestAnimationFrame(tick);
+                }).catch(function(){scanning=false;qrScanTimer=requestAnimationFrame(tick);});
+                return;
+            }
+            if(!useBD){
+                canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+                ctx.drawImage(video,0,0,canvas.width,canvas.height);
+                var img=ctx.getImageData(0,0,canvas.width,canvas.height);
+                var code=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+                if(code&&code.data){stopQRScan();processQR(code.data);return;}
+            }
         }
         qrScanTimer=requestAnimationFrame(tick);
     }
@@ -428,6 +440,26 @@ function loadQRFromFile(input) {
     if(!input.files||!input.files[0]) return;
     var file=input.files[0];
     showToast("Reading image...");
+    // Try BarcodeDetector first (native, handles noisy images well)
+    if(window.BarcodeDetector){
+        createImageBitmap(file).then(function(bmp){
+            var bd=new BarcodeDetector({formats:["qr_code"]});
+            return bd.detect(bmp);
+        }).then(function(codes){
+            if(codes&&codes.length>0&&codes[0].rawValue){
+                processQR(codes[0].rawValue);
+            } else {
+                fallbackJsQR(file);
+            }
+        }).catch(function(){
+            fallbackJsQR(file);
+        });
+    } else {
+        fallbackJsQR(file);
+    }
+    input.value="";
+}
+function fallbackJsQR(file) {
     var reader=new FileReader();
     reader.onload=function(e){
         var img=new Image();
@@ -454,7 +486,6 @@ function loadQRFromFile(input) {
         img.src=e.target.result;
     };
     reader.readAsDataURL(file);
-    input.value="";
 }
 </script>
 </body>
