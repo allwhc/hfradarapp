@@ -37,6 +37,32 @@
             <p id="syncMsg" style="margin-top:8px; text-align:center; font-size:13px;"></p>
         </div>
 
+        <!-- View Attendance (Admin) -->
+        <div class="card" style="margin-top:10px;">
+            <div id="attLocked" style="display:flex; align-items:center; gap:10px;">
+                <h4 style="font-size:15px; color:#333; flex:1;">View Attendance</h4>
+                <input type="password" id="attPwd" placeholder="Admin password" style="width:140px; padding:8px 10px; font-size:13px;">
+                <button class="btn btn-primary btn-small" onclick="unlockAttendance()">Unlock</button>
+            </div>
+            <p id="attPwdErr" style="color:#dc3545; font-size:12px; margin-top:6px; display:none;">Incorrect password</p>
+
+            <div id="attPanel" style="display:none;">
+                <h4 style="font-size:15px; color:#333; margin-bottom:12px;">View Attendance</h4>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <div class="field" style="flex:1;">
+                        <label>Date</label>
+                        <input type="date" id="attDate" style="width:100%; padding:8px 10px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+                    </div>
+                    <div class="field" style="flex:1;">
+                        <label>Site</label>
+                        <select id="attSite" style="width:100%; padding:8px 10px;"></select>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="fetchAttendance()">Fetch Attendance</button>
+                <div id="attResult" style="margin-top:12px;"></div>
+            </div>
+        </div>
+
         <div style="margin-top:20px; text-align:center;">
             <button class="btn btn-outline" onclick="logout()">Logout</button>
         </div>
@@ -83,6 +109,68 @@ function syncSites() {
     }, function(err) {
         document.getElementById("btnSync").disabled = false;
         document.getElementById("syncMsg").innerHTML = '<span style="color:#dc3545;">Error: ' + err + '</span>';
+    });
+}
+
+function unlockAttendance() {
+    var pwd = document.getElementById("attPwd").value.trim();
+    if (pwd === "niot@niot") {
+        document.getElementById("attLocked").style.display = "none";
+        document.getElementById("attPwdErr").style.display = "none";
+        document.getElementById("attPanel").style.display = "block";
+        // Set default date to today
+        var today = new Date();
+        var dd = today.getDate()<10?"0"+today.getDate():""+today.getDate();
+        var mm = (today.getMonth()+1)<10?"0"+(today.getMonth()+1):""+(today.getMonth()+1);
+        document.getElementById("attDate").value = today.getFullYear()+"-"+mm+"-"+dd;
+        // Populate site dropdown
+        var sites = getSitesList();
+        var sh = '<option value="">All Sites</option>';
+        for (var i=0;i<sites.length;i++) sh+='<option value="'+sites[i]+'">'+sites[i]+'</option>';
+        document.getElementById("attSite").innerHTML = sh;
+    } else {
+        document.getElementById("attPwdErr").style.display = "block";
+    }
+}
+
+function fetchAttendance() {
+    var dt = document.getElementById("attDate").value;
+    var site = document.getElementById("attSite").value;
+    var result = document.getElementById("attResult");
+    result.innerHTML = '<div class="spinner"></div>';
+
+    var payload = {};
+    if (dt) payload.date = dt;
+    if (site) payload.site_code = site;
+
+    apiPost(getServerUrl() + "/getAttendance", payload, function(resp) {
+        if (resp && resp.stat === "success" && resp.records) {
+            if (resp.records.length === 0) {
+                result.innerHTML = '<p style="text-align:center; color:#999; font-size:14px;">No attendance records found.</p>';
+                return;
+            }
+            var html = '<div class="table-scroll"><table class="verify-table">';
+            html += '<tr><th>Name</th><th>Site</th><th>Time</th><th>Distance</th></tr>';
+            for (var i=0;i<resp.records.length;i++) {
+                var r = resp.records[i];
+                var ts = r.timestamp||"";
+                var timePart = ts.indexOf(" ")>-1 ? ts.split(" ")[1].substring(0,5) : ts;
+                var datePart = ts.indexOf(" ")>-1 ? ts.split(" ")[0] : "";
+                html += '<tr>';
+                html += '<td style="text-align:left;">'+r.staff_name+'</td>';
+                html += '<td>'+r.site_code+'</td>';
+                html += '<td>'+(dt?timePart:datePart+" "+timePart)+'</td>';
+                html += '<td>'+r.distance_str+'</td>';
+                html += '</tr>';
+            }
+            html += '</table></div>';
+            html += '<p style="text-align:center; color:#999; font-size:12px; margin-top:6px;">'+resp.records.length+' record(s)</p>';
+            result.innerHTML = html;
+        } else {
+            result.innerHTML = '<p style="text-align:center; color:#dc3545; font-size:14px;">Failed to fetch records.</p>';
+        }
+    }, function(err) {
+        result.innerHTML = '<p style="text-align:center; color:#dc3545; font-size:14px;">Error: '+err+'</p>';
     });
 }
 
