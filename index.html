@@ -53,6 +53,10 @@
                 <div class="field"><label>Year</label><select id="selYear" onchange="onSelectionChange()"></select></div>
                 <div class="field"><label>Site</label><select id="selSite" onchange="onSelectionChange()"></select></div>
             </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Technician</label>
+                <input type="text" id="txtTechnician" placeholder="Technician name">
+            </div>
         </div>
 
         <!-- Total -->
@@ -171,14 +175,27 @@ function initDropdowns() {
     var last = localStorage.getItem("hfr_last_site");
     if (last) document.getElementById("selSite").value = last;
 
+    updateTechnicianField();
     buildDayGrid();
 }
 
 function onSelectionChange() {
     var site = document.getElementById("selSite").value;
     if (site) localStorage.setItem("hfr_last_site", site);
+    updateTechnicianField();
     dataSaved = false; dataSent = false; qrSourceType = "Manual";
     if (!loadSavedData()) { radialValues = []; reasons = []; buildDayGrid(); }
+}
+
+function updateTechnicianField() {
+    var site = document.getElementById("selSite").value;
+    var techField = document.getElementById("txtTechnician");
+    if (site) {
+        var techName = getTechnicianForSite(site);
+        techField.value = techName;
+    } else {
+        techField.value = "";
+    }
 }
 
 // ===== DAY GRID =====
@@ -390,8 +407,10 @@ function doSend(site,month,year,total) {
         if(reasons[i]&&reasons[i]!=="") e.reason=reasons[i];
         cred1.push(e);
     }
+    var techName = document.getElementById("txtTechnician").value.trim();
     showToast("Sending data..."); document.getElementById("btnSend").disabled=true;
-    apiPost(getServerUrl()+"/upldTsuData",{source_type:qrSourceType,cred1:cred1},function(resp){
+    apiPost(getServerUrl()+"/upldTsuData",{source_type:qrSourceType,technician_name:techName,cred1:cred1},function(resp){
+        localStorage.setItem("hfr_last_sent_site", site);
         dataSent=true; dataLocked=false;
         var k=storageKey(),s=localStorage.getItem(k);
         if(s){var o=JSON.parse(s);o.sent=true;localStorage.setItem(k,JSON.stringify(o));}

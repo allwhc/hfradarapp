@@ -32,12 +32,12 @@
     <div class="page-body">
         <div class="card">
             <div class="field">
-                <label>Your Name</label>
-                <input type="text" id="attName" placeholder="Enter your name">
+                <label>Select Site</label>
+                <select id="attSite" onchange="onAttSiteChange()"><option value="">-- Select Site --</option></select>
             </div>
             <div class="field">
-                <label>Select Site</label>
-                <select id="attSite"><option value="">-- Select Site --</option></select>
+                <label>Technician Name</label>
+                <input type="text" id="attName" placeholder="Technician name">
             </div>
             <button class="btn btn-success btn-full" id="btnMark" onclick="markAttendance()" style="margin-top:15px;">
                 Mark My Today's Attendance
@@ -61,11 +61,28 @@ document.addEventListener("DOMContentLoaded", function() {
     var h = '<option value="">-- Select Site --</option>';
     for (var i=0; i<sites.length; i++) h += '<option value="'+sites[i]+'">'+sites[i]+'</option>';
     document.getElementById("attSite").innerHTML = h;
-    var sn = localStorage.getItem("hfr_att_name");
+
+    // Pre-fill site: use last attendance site, or fall back to last sent report site
     var ss = localStorage.getItem("hfr_att_site");
-    if (sn) document.getElementById("attName").value = sn;
+    if (!ss) ss = localStorage.getItem("hfr_last_sent_site") || "";
     if (ss) document.getElementById("attSite").value = ss;
+
+    // Auto-fill technician name from stored preferences
+    var sn = localStorage.getItem("hfr_att_name");
+    if (sn) {
+        document.getElementById("attName").value = sn;
+    } else {
+        onAttSiteChange();
+    }
 });
+
+function onAttSiteChange() {
+    var site = document.getElementById("attSite").value;
+    var nameField = document.getElementById("attName");
+    if (site && !nameField.value.trim()) {
+        nameField.value = getTechnicianForSite(site);
+    }
+}
 
 function markAttendance() {
     var name = document.getElementById("attName").value.trim();

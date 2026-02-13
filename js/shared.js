@@ -18,6 +18,15 @@ function getSitesList() {
     if (stored) { try { return JSON.parse(stored); } catch(e) {} }
     return DEFAULT_SITES;
 }
+function getTechniciansMap() {
+    var stored = localStorage.getItem("hfr_technicians");
+    if (stored) { try { return JSON.parse(stored); } catch(e) {} }
+    return {};
+}
+function getTechnicianForSite(siteCode) {
+    var map = getTechniciansMap();
+    return map[siteCode] || "";
+}
 function getDaysInMonth(month, year) {
     return new Date(year, month, 0).getDate();
 }

@@ -99,6 +99,9 @@ function syncSites() {
         document.getElementById("btnSync").disabled = false;
         if (resp && resp.sites && resp.sites.length > 0) {
             localStorage.setItem("hfr_sites_list", JSON.stringify(resp.sites));
+            if (resp.technicians) {
+                localStorage.setItem("hfr_technicians", JSON.stringify(resp.technicians));
+            }
             localStorage.setItem("hfr_sites_synced", new Date().toLocaleString());
             updateSitesInfo();
             document.getElementById("syncMsg").innerHTML = '<span style="color:green;">Updated! ' + resp.sites.length + ' sites loaded.</span>';
