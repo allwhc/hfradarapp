@@ -70,9 +70,9 @@
         <!-- Day Grid -->
         <div id="dayGrid" class="day-grid"></div>
 
-        <!-- Save / Send -->
-        <div class="action-row">
-            <button class="btn btn-warning btn-half" onclick="saveData()">SAVE</button>
+        <!-- Save / Send (sticky) -->
+        <div class="sticky-actions">
+            <button class="btn btn-warning btn-half" id="btnSaveLock" onclick="toggleLock()">SAVE & LOCK</button>
             <button class="btn btn-success btn-half" id="btnSend" onclick="sendData()" disabled>SEND</button>
         </div>
     </div>
@@ -213,10 +213,15 @@ function buildDayGrid() {
         html += '</div></div>';
     }
     document.getElementById("dayGrid").innerHTML = html;
+    // When grid is locked, tapping it shakes the lock button
+    document.getElementById("dayGrid").onclick = function(e) {
+        if(dataLocked) { shakeLockBtn(); }
+    };
     updateTotal(); updateStatus();
 }
 
 function adj(idx, d) {
+    if(dataLocked){ shakeLockBtn(); return; }
     var v = (radialValues[idx]||0)+d;
     if (v<0) v=0; if (v>24) v=24;
     radialValues[idx]=v;
@@ -228,6 +233,7 @@ function adj(idx, d) {
     else { nb.className = (reasons[idx]&&reasons[idx]!=="") ? "btn-note has-reason" : "btn-note"; }
 }
 function ddChange(idx) {
+    if(dataLocked){ shakeLockBtn(); return; }
     var v = parseInt(document.getElementById("dd"+idx).value);
     radialValues[idx]=v;
     dataSaved=false; dataSent=false;
@@ -242,15 +248,11 @@ function updateTotal() {
     document.getElementById("totalRadial").textContent=t;
 }
 
-function updateStatus() {
-    var b=document.getElementById("dataStatus"), s=document.getElementById("btnSend");
-    if(dataSent){b.style.display="inline-block";b.className="status-badge status-sent";b.textContent="Sent";s.disabled=true;}
-    else if(dataSaved){b.style.display="inline-block";b.className="status-badge status-saved";b.textContent="Saved";s.disabled=false;}
-    else{b.style.display="none";s.disabled=true;}
-}
+function updateStatus() { updateLockUI(); }
 
 // ===== REASON MODAL =====
 function openReasonModal(idx) {
+    if(dataLocked){ shakeLockBtn(); return; }
     currentReasonDay=idx;
     var m=parseInt(document.getElementById("selMonth").value), y=parseInt(document.getElementById("selYear").value);
     document.getElementById("reasonDayLabel").textContent=(idx+1)+"/"+m+"/"+y;
@@ -290,26 +292,76 @@ function saveReason() {
 }
 function closeReasonModal() { document.getElementById("reasonModal").style.display="none"; currentReasonDay=-1; }
 
-// ===== SAVE / SEND =====
+// ===== SAVE & LOCK / UNLOCK & EDIT =====
+var dataLocked = false;
+
 function storageKey() {
     return "hfr_data_"+document.getElementById("selSite").value+"_"+document.getElementById("selMonth").value+"_"+document.getElementById("selYear").value;
 }
-function saveData() {
-    var site=document.getElementById("selSite").value;
-    if(!site){showToast("Please select a site");return;}
-    var t=0; for(var i=0;i<radialValues.length;i++) t+=(radialValues[i]||0);
-    if(!confirm("Total Radial Count: "+t+"\n\nIs this correct?")) return;
-    localStorage.setItem(storageKey(), JSON.stringify({
-        site:site, month:document.getElementById("selMonth").value,
-        year:document.getElementById("selYear").value,
-        radials:radialValues.slice(), reasons:reasons.slice(),
-        total:t, sent:false, source:qrSourceType, savedAt:new Date().toISOString()
-    }));
-    dataSaved=true; dataSent=false; updateStatus(); showToast("Data saved locally");
+function toggleLock() {
+    if (dataLocked) {
+        // Unlock
+        dataLocked = false;
+        dataSaved = false;
+        setGridLocked(false);
+        updateLockUI();
+        showToast("Unlocked for editing");
+    } else {
+        // Save & Lock
+        var site=document.getElementById("selSite").value;
+        if(!site){showToast("Please select a site");return;}
+        var t=0; for(var i=0;i<radialValues.length;i++) t+=(radialValues[i]||0);
+        if(!confirm("Total Radial Count: "+t+"\n\nIs this correct?")) return;
+        localStorage.setItem(storageKey(), JSON.stringify({
+            site:site, month:document.getElementById("selMonth").value,
+            year:document.getElementById("selYear").value,
+            radials:radialValues.slice(), reasons:reasons.slice(),
+            total:t, sent:false, source:qrSourceType, savedAt:new Date().toISOString()
+        }));
+        dataSaved=true; dataSent=false; dataLocked=true;
+        setGridLocked(true);
+        updateLockUI();
+        showToast("Data saved & locked");
+    }
+}
+function setGridLocked(locked) {
+    var grid=document.getElementById("dayGrid");
+    var adjs=grid.querySelectorAll(".btn-adj");
+    var dds=grid.querySelectorAll(".radial-dd");
+    var notes=grid.querySelectorAll(".btn-note");
+    for(var i=0;i<adjs.length;i++) adjs[i].disabled=locked;
+    for(var i=0;i<dds.length;i++) dds[i].disabled=locked;
+    for(var i=0;i<notes.length;i++) notes[i].disabled=locked;
+    if(locked) grid.classList.add("grid-locked");
+    else grid.classList.remove("grid-locked");
+}
+function shakeLockBtn() {
+    var btn=document.getElementById("btnSaveLock");
+    btn.classList.remove("shake");
+    void btn.offsetWidth; // force reflow
+    btn.classList.add("shake");
+}
+function updateLockUI() {
+    var btn=document.getElementById("btnSaveLock");
+    var send=document.getElementById("btnSend");
+    var st=document.getElementById("dataStatus");
+    if(dataSent){
+        btn.textContent="SAVE & LOCK"; btn.className="btn btn-warning btn-half";
+        st.style.display="inline-block"; st.className="status-badge status-sent"; st.textContent="Sent";
+        send.disabled=true; dataLocked=false; setGridLocked(false);
+    } else if(dataLocked){
+        btn.textContent="UNLOCK & EDIT"; btn.className="btn btn-outline btn-half";
+        st.style.display="inline-block"; st.className="status-badge status-saved"; st.textContent="Saved";
+        send.disabled=false;
+    } else {
+        btn.textContent="SAVE & LOCK"; btn.className="btn btn-warning btn-half";
+        st.style.display="none";
+        send.disabled=true;
+    }
 }
 function loadSavedData() {
     var d=localStorage.getItem(storageKey());
-    if(d){try{var o=JSON.parse(d);if(o.sent){return false;}radialValues=o.radials||[];reasons=o.reasons||[];dataSaved=true;dataSent=false;qrSourceType=o.source||"Manual";buildDayGrid();return true;}catch(e){}}
+    if(d){try{var o=JSON.parse(d);if(o.sent){return false;}radialValues=o.radials||[];reasons=o.reasons||[];dataSaved=true;dataSent=false;dataLocked=true;qrSourceType=o.source||"Manual";buildDayGrid();setGridLocked(true);updateLockUI();return true;}catch(e){}}
     return false;
 }
 function sendData() {
@@ -340,10 +392,10 @@ function doSend(site,month,year,total) {
     }
     showToast("Sending data..."); document.getElementById("btnSend").disabled=true;
     apiPost(getServerUrl()+"/upldTsuData",{source_type:qrSourceType,cred1:cred1},function(resp){
-        dataSent=true;
+        dataSent=true; dataLocked=false;
         var k=storageKey(),s=localStorage.getItem(k);
         if(s){var o=JSON.parse(s);o.sent=true;localStorage.setItem(k,JSON.stringify(o));}
-        updateStatus(); showToast("Data sent successfully!");
+        setGridLocked(false); updateLockUI(); showToast("Data sent successfully!");
         addHistory(site,month,year,total,qrSourceType,true);
     },function(err){
         document.getElementById("btnSend").disabled=false;
@@ -361,7 +413,7 @@ function resetData() {
     if(!confirm("Reset all radial values to 0?")) return;
     var d=radialValues.length; radialValues=[]; reasons=[];
     for(var i=0;i<d;i++){radialValues.push(0);reasons.push("");}
-    dataSaved=false;dataSent=false;qrSourceType="Manual";buildDayGrid();showToast("All values reset");
+    dataSaved=false;dataSent=false;dataLocked=false;qrSourceType="Manual";buildDayGrid();updateLockUI();showToast("All values reset");
 }
 
 // ===== QR SCANNER (native getUserMedia + jsQR) =====
