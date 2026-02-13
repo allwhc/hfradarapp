@@ -67,20 +67,20 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!ss) ss = localStorage.getItem("hfr_last_sent_site") || "";
     if (ss) document.getElementById("attSite").value = ss;
 
-    // Auto-fill technician name from stored preferences
-    var sn = localStorage.getItem("hfr_att_name");
-    if (sn) {
-        document.getElementById("attName").value = sn;
-    } else {
-        onAttSiteChange();
-    }
+    // Auto-fill technician name based on selected site
+    onAttSiteChange();
 });
 
 function onAttSiteChange() {
     var site = document.getElementById("attSite").value;
     var nameField = document.getElementById("attName");
-    if (site && !nameField.value.trim()) {
-        nameField.value = getTechnicianForSite(site);
+    if (site) {
+        var techName = getTechnicianForSite(site);
+        if (techName) {
+            nameField.value = techName;
+        }
+    } else {
+        nameField.value = "";
     }
 }
 

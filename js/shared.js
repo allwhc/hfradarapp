@@ -114,3 +114,17 @@ function apiPost(url, data, onSuccess, onError) {
     .then(function(json) { onSuccess(json); })
     .catch(function(err) { onError(err.message || "Network error"); });
 }
+
+// ===== AUTO-FETCH CONFIG (technicians + sites) if missing =====
+(function() {
+    if (!localStorage.getItem("hfr_technicians")) {
+        apiPost(getServerUrl() + "/getConfig", {}, function(resp) {
+            if (resp && resp.sites && resp.sites.length > 0) {
+                localStorage.setItem("hfr_sites_list", JSON.stringify(resp.sites));
+            }
+            if (resp && resp.technicians) {
+                localStorage.setItem("hfr_technicians", JSON.stringify(resp.technicians));
+            }
+        }, function() { /* silent fail */ });
+    }
+})();
