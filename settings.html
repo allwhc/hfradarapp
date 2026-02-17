@@ -64,7 +64,6 @@
         </div>
 
         <div style="margin-top:20px; text-align:center;">
-            <button class="btn btn-outline" onclick="logout()">Logout</button>
         </div>
     </div>
 </div>
@@ -177,10 +176,6 @@ function fetchAttendance() {
     });
 }
 
-function logout() {
-    sessionStorage.removeItem("hfr_logged_in");
-    window.location.replace("login.html");
-}
 </script>
 </body>
 </html>

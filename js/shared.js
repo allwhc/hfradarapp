@@ -1,8 +1,3 @@
-// ===== AUTH CHECK =====
-if (sessionStorage.getItem("hfr_logged_in") !== "true") {
-    window.location.replace("login.html");
-}
-
 // ===== CONFIG =====
 var SERVER_URL = "https://hfradarsite.pythonanywhere.com";
 var DEFAULT_SITES = ["Cuda","Kalp","Mach","Yanm","Wasi","Jgri","Gopa","Puri","Ptbl","Htby"];
